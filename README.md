@@ -5,7 +5,7 @@ Fork from better save instance. (Konstant decompiler supports now luau version 1
 
 ```lua
 local Params = {
- RepoURL = "https://raw.githubusercontent.com/hcrdso/ImprovedSaveinstance/refs/heads/main/",
+ RepoURL = "https://raw.githubusercontent.com/hcrdso/ImprovedSaveInstance/refs/heads/main/",
  SSI = "saveinstance",
 }
 local synsaveinstance = loadstring(game:HttpGet(Params.RepoURL .. Params.SSI .. ".luau", true), Params.SSI)()
