@@ -1,7 +1,6 @@
 --!native
 --!optimize 2
 --!divine-intellect
--- https://discord.gg/wx4ThpAsmw
 
 local function string_find(s, pattern)
 	return string.find(s, pattern, nil, true)
@@ -2245,10 +2244,11 @@ local function synsaveinstance(CustomOptions, CustomOptions2)
 		end
 	end
 
-	local currentstr, currentsize, totalsize, chunks = "", 0, 0, table.create(1)
+	-- Improved string builder: use table of string chunks to avoid huge string concatenations that cause OOM / "not enough memory" on some executors
+	local current_chunks, currentsize, totalsize, chunks = {}, 0, 0, table.create(1)
 	local savebuffer, savebuffer_size = {}, 1
 	local header =
-		'<!-- Saved by ImprovedSaveInstance -> original save instance discord https://discord.gg/wx4ThpAsmw --><roblox version="4">'
+		'<!-- Saved by ImprovedSaveInstance (fork of USSI/BetterSaveinstance + Konstant decompiler, SaveAsAttributes, Crashlog, terrain MaterialColors & more) | https://github.com/hcrdso/ImprovedSaveInstance | original discord: https://discord.gg/wx4ThpAsmw --><roblox version="4">'
 
 	local StatusText
 
@@ -2544,15 +2544,29 @@ local function synsaveinstance(CustomOptions, CustomOptions2)
 		if writefile and appendfile then
 			__DEBUG_MODE = true
 			local CRASHLOG_ID = service.HttpService:GenerateGUID(false)
-			writefile("CRASHLOG_"..CRASHLOG_ID, "ImprovedSaveinstance crashlog (id:"..CRASHLOG_ID..", placeid:"..tostring(game.PlaceId)..") below")
+			local crashlog_name = "CRASHLOG_" .. CRASHLOG_ID .. ".txt"
+			local header_log = string.format(
+				"ImprovedSaveInstance Crashlog\nID: %s\nPlaceId: %s\nPlaceVersion: %s\nClient: %s\nExecutor: %s\nTime: %s\n---\n",
+				CRASHLOG_ID,
+				tostring(game.PlaceId),
+				tostring(game.PlaceVersion),
+				tostring(version()),
+				EXECUTOR_NAME,
+				os.date("%Y-%m-%d %H:%M:%S")
+			)
+			writefile(crashlog_name, header_log)
 			Crashlog = function(text)
-				appendfile("CRASHLOG_"..CRASHLOG_ID, "\n ["..tostring(DateTime.now().UnixTimestampMillis).."] "..text)
+				pcall(appendfile, crashlog_name, "\n[" .. tostring(DateTime.now().UnixTimestampMillis) .. "] " .. tostring(text))
 			end
 			old_warn = warn
 			function warn(...)
 				old_warn(...)
-				local text = table.concat({...}, " ")
+				local args = table.pack(...)
+				local text = table.concat(args, " ", 1, args.n)
 				Crashlog(text)
+			end
+			if __DEBUG_MODE then
+				__DEBUG_MODE("Crashlog enabled: " .. crashlog_name)
 			end
 		else
 			warn("The functions writefile and appendfile are required for option Crashlog")
@@ -2940,11 +2954,27 @@ local function synsaveinstance(CustomOptions, CustomOptions2)
 	end
 	if getscriptbytecode then
 		if (decompile == nil and OPTIONS.decomptype == "") or OPTIONS.decomptype == "custom" then
-			if __DEBUG_MODE then __DEBUG_MODE("Attempting to load Konstant Decompiler. If there is an error/crash after this, set the option decomptype to any string other than custom") end
-			local url = "https://raw.githubusercontent.com/hcrdso/ImprovedSaveInstance/refs/heads/main/ThirdParty/KonstantV2.1.luau"
-			local konstant = loadstring(game:HttpGet(url, true))()
-			GLOBAL_ENV.decompile = konstant.decompile
-			if __DEBUG_MODE then __DEBUG_MODE("Konstant Decompiler loaded") end
+			if __DEBUG_MODE then
+				__DEBUG_MODE("Attempting to load Konstant Decompiler (Luau v11+). If error/crash, set decomptype to any other string")
+			end
+			local ok, result = pcall(function()
+				local url = "https://raw.githubusercontent.com/hcrdso/ImprovedSaveInstance/refs/heads/main/ThirdParty/KonstantV2.1.luau"
+				local src = game:HttpGet(url, true)
+				local konstant = loadstring(src, "KonstantV2.1")()
+				return konstant.decompile
+			end)
+			if ok and type(result) == "function" then
+				GLOBAL_ENV.decompile = result
+				decompile = result
+				if __DEBUG_MODE then
+					__DEBUG_MODE("Konstant Decompiler loaded successfully")
+				end
+			else
+				warn("[ImprovedSaveInstance] Failed to load Konstant decompiler:", result)
+				if __DEBUG_MODE then
+					__DEBUG_MODE("Falling back to built-in decompile (if any)")
+				end
+			end
 		end
 	end
 	do
@@ -3320,23 +3350,26 @@ local function synsaveinstance(CustomOptions, CustomOptions2)
 		return prop_list
 	end
 
-	local CHUNK_LIMIT = 200 * 1024 * 1024 -- string length overflow prevention
+	local CHUNK_LIMIT = 50 * 1024 * 1024 -- 50MB per mega-chunk (reduced from 200MB to lower peak memory usage)
 	local function save_cache(final)
 		local savestr = table.concat(savebuffer)
-		currentstr ..= savestr -- TODO: Causes "not enough memory" error on some exec
-
-		-- writefile(placename, totalstr)
-		-- appendfile(placename, savestr) -- * supposedly causes uneven amount of Tags (e.g. <Item> must be closed with </Item> but sometimes there's more of one than the other). While being under load, the function produces unexpected output?
 		local savestr_len = #savestr
-		totalsize += savestr_len
-		currentsize += savestr_len
+
+		-- Append to table of chunks instead of huge string concat (fixes OOM on many executors)
+		if savestr_len > 0 then
+			table.insert(current_chunks, savestr)
+			totalsize += savestr_len
+			currentsize += savestr_len
+		end
 
 		table.clear(savebuffer)
 		savebuffer_size = 1
 
-		if CHUNK_LIMIT < currentsize or final then
-			table.insert(chunks, { size = currentsize, str = currentstr })
-			currentstr, currentsize = "", 0
+		if (CHUNK_LIMIT < currentsize or final) and currentsize > 0 then
+			local mega = table.concat(current_chunks)
+			table.insert(chunks, { size = currentsize, str = mega })
+			table.clear(current_chunks)
+			currentsize = 0
 		end
 
 		if StatusText then
@@ -3736,7 +3769,7 @@ local function synsaveinstance(CustomOptions, CustomOptions2)
 											end
 										end
 
-										value = "-- Saved by ImprovedSaveInstance -> original save instance discord https://discord.gg/wx4ThpAsmw\n\n"
+										value = "-- Saved by ImprovedSaveInstance (https://github.com/hcrdso/ImprovedSaveInstance)\n\n"
 											.. (hasLinkedSource and "-- Original Source: https://assetdelivery.roblox.com/v1/asset/?" .. (LinkedSource_type or "id") .. "=" .. (LinkedSource or LinkedSource_Url) .. "\n\n" or "")
 											.. value
 									end
@@ -3993,7 +4026,7 @@ local function synsaveinstance(CustomOptions, CustomOptions2)
 		end
 
 		savebuffer[savebuffer_size] =
-			"</roblox><!-- Saved by ImprovedSaveInstance -> original save instance discord https://discord.gg/wx4ThpAsmw -->"
+			"</roblox><!-- Saved by ImprovedSaveInstance (https://github.com/hcrdso/ImprovedSaveInstance) -->"
 		savebuffer_size += 1
 		save_cache(true)
 		do
@@ -4016,17 +4049,22 @@ local function synsaveinstance(CustomOptions, CustomOptions2)
 
 			local Callback = OPTIONS.Callback
 			if Callback then
-				local totalstr = header
-				for _, chunk in chunks do
-					totalstr ..= chunk.str
+				-- Prefer not to build full string if too large; pass chunks so callback can stream
+				local totalstr
+				if totalsize < 80 * 1024 * 1024 then -- only full concat if <80MB
+					totalstr = header
+					for _, chunk in chunks do
+						totalstr ..= chunk.str
+					end
 				end
-				Callback(totalstr, chunks, totalsize)
-			elseif OPTIONS.AlternativeWritefile and appendfile then
-				local SEGMENT_SIZE = 4145728 -- Celery has an arbitrary savefile/appendfile size limit of ~4MB for reasons unknown. This is a workaround to save the file in segments.
+				Callback(totalstr, chunks, totalsize, header)
+			elseif (OPTIONS.AlternativeWritefile or totalsize > 40 * 1024 * 1024) and appendfile then
+				-- Always prefer segmented append for large files or when AlternativeWritefile enabled (avoids OOM)
+				local SEGMENT_SIZE = 4145728 -- Celery has an arbitrary savefile/appendfile size limit of ~4MB
 
-				local totallen, currentlen = math.ceil(totalsize / SEGMENT_SIZE), 1
+				local totallen, currentlen = math.ceil((totalsize + #header) / SEGMENT_SIZE), 1
 
-				writefile(placename, header)
+				run_with_loading("Writing header...", nil, true, writefile, placename, header)
 				for _, chunk in chunks do
 					local length = math.ceil(chunk.size / SEGMENT_SIZE)
 					for i = 1, length do
