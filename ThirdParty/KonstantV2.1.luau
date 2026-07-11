@@ -1099,7 +1099,7 @@ local function v296(v226)
         v228 = v228 + 1;
         v245 = v247;
         if v245 > 3 then
-            error((("Types version %* not supported. Only version 1 is supported."):format(v245)));
+            error((("Types version %* not supported. Only versions 1-3 are supported."):format(v245)));
         end;
     end;
     local v248 = {};
