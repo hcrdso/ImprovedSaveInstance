@@ -13,6 +13,6 @@ local Options = {SaveBytecode = true, decomptype = "custom", SafeMode = false}
 synsaveinstance(Options)
 ```
 
-Original save instance: https://github.com/luau/UniversalSynSaveInstance
+Original save instance: https://github.com/luau/UniversalSynSaveInstance -> https://discord.gg/wx4ThpAsmw
 
 Better save instance: https://github.com/Devraj2010isme/BetterSaveinstance
