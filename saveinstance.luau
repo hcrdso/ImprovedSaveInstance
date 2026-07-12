@@ -2078,7 +2078,7 @@ All options are case insensitive.
   - Default: true
 - decomptype: `string`
   - "custom" - for a built-in custom decompiler.
-  - Uses Konstant 2.1, locally hosted instead of the API to increase speed. ([Konstant Discord Server](https://discord.gg/brNTY8nX8t), [Konstant Decompiled Source Code](https://raw.githubusercontent.com/Devraj2010isme/ImprovedSaveInstance/refs/heads/main/Dependencies/Konstant%20V2.1.luau))
+  - Uses Konstant 2.1, locally hosted instead of the API to increase speed. ([Konstant Discord Server](https://discord.gg/brNTY8nX8t), [Konstant Decompiled Source Code](https://raw.githubusercontent.com/Devraj2010isme/BetterSaveInstance/refs/heads/main/Dependencies/Konstant%20V2.1.luau))
   - Default: Your executor's decompiler, if available. Otherwise uses "custom" if not.
 - timeout: `number`
   - If the decompilation run time exceeds this value it gets cancelled.
@@ -2248,7 +2248,7 @@ local function synsaveinstance(CustomOptions, CustomOptions2)
 	local current_chunks, currentsize, totalsize, chunks = {}, 0, 0, table.create(1)
 	local savebuffer, savebuffer_size = {}, 1
 	local header =
-		'<!-- Saved by ImprovedSaveInstance (fork of USSI/BetterSaveinstance + Konstant decompiler, SaveAsAttributes, Crashlog, terrain MaterialColors & more) | https://github.com/hcrdso/ImprovedSaveInstance | original discord: https://discord.gg/wx4ThpAsmw --><roblox version="4">'
+		'<!-- Saved by ImprovedSaveInstance | original save instance discord: https://discord.gg/wx4ThpAsmw --><roblox version="4">'
 
 	local StatusText
 
@@ -2955,7 +2955,7 @@ local function synsaveinstance(CustomOptions, CustomOptions2)
 	if getscriptbytecode then
 		if (decompile == nil and OPTIONS.decomptype == "") or OPTIONS.decomptype == "custom" then
 			if __DEBUG_MODE then
-				__DEBUG_MODE("Attempting to load Konstant Decompiler (Luau v11+). If error/crash, set decomptype to any other string")
+				__DEBUG_MODE("Attempting to load Konstant Decompiler. If error/crash, set decomptype to any other string")
 			end
 			local ok, result = pcall(function()
 				local url = "https://raw.githubusercontent.com/hcrdso/ImprovedSaveInstance/refs/heads/main/ThirdParty/KonstantV2.1.luau"
